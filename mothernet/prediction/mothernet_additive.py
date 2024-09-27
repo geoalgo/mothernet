@@ -400,14 +400,12 @@ class MotherNetAdditiveClassifierPairEffects(MotherNetAdditiveClassifier):
             path=path, device=device, inference_device=inference_device, model=model, config=config,
             cat_features=cat_features,
         )
-        print("Yooo!")
         self.n_pair_feature_max_ratio = n_pair_feature_max_ratio
         assert pair_strategy in ["sum_importance", "fast"]
         self.pair_strategy = pair_strategy
 
     def fit(self, X, y):
-        print("Fit!")
-        print(self.n_pair_feature_max_ratio)
+        print(f"Fit with {self.n_pair_feature_max_ratio} pair ratio")
         if self.n_pair_feature_max_ratio > 0:
             # compute pairs according the selected strategy
             self.pairs_ = compute_top_pairs(

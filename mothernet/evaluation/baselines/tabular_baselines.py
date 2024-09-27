@@ -920,6 +920,8 @@ def lightgbm_metric(x, y, test_x, test_y, cat_features, metric_used, max_time=30
 
 
 param_grid_hyperopt['logistic'] = {
+    # 'penalty': hp.choice('penalty', ['l1', 'l2', 'none']), 'max_iter': hp.randint('max_iter', 50, 500), 'fit_intercept': hp.choice('fit_intercept', [True, False]), 'C': hp.loguniform('C', -5, math.log(5.0))}  # 'normalize': [False],
+    # 'none' is not a valid penalty with scikit-learn 1.5.2, maybe we could tag the sklearn version in environment.yml
     'penalty': hp.choice('penalty', ['l1', 'l2']), 'max_iter': hp.randint('max_iter', 50, 500), 'fit_intercept': hp.choice('fit_intercept', [True, False]), 'C': hp.loguniform('C', -5, math.log(5.0))}  # 'normalize': [False],
 
 

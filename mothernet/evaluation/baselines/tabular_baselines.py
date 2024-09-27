@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import sklearn
 from hyperopt import Trials, fmin, hp, rand, space_eval
-from lightgbm import LGBMClassifier
+# from lightgbm import LGBMClassifier
 from sklearn import neighbors
 from sklearn.compose import ColumnTransformer
 from sklearn.gaussian_process import GaussianProcessClassifier, GaussianProcessRegressor
@@ -153,28 +153,28 @@ def hyperfast_metric(x, y, test_x, test_y, cat_features, metric_used, max_time=3
     return metric, pred, times
 
 
-param_grid_hyperopt['hyperfast'] = {
-    'n_ensemble': hp.choice('n_ensemble', [1, 4, 8, 16, 32]),
-    'batch_size': hp.choice('batch_size', [1024, 2048]),
-    'nn_bias': hp.choice('nn_bias', [True, False]),
-    'stratify_sampling': hp.choice('stratify_sampling', [True, False]),
-    'optimization': hp.choice('optimization', [None, 'optimize', 'ensemble_optimize']),
-    'optimize_steps': hp.choice('optimize_steps', [1, 4, 8, 16, 32, 64, 128]),
-}
-
-
-def hyperfast_metric_tuning(x, y, test_x, test_y, cat_features, metric_used, max_time=300, device='cpu', **kwargs):
-    from hyperfast import HyperFastClassifier
-    print(f"device: {device}")
-    x = x.numpy()
-    y = y.numpy()
-    test_x = test_x.numpy()
-    test_y = test_y.numpy()
-
-    def clf_(**params):
-        return HyperFastClassifier(device=device, cat_features=cat_features, **params)
-
-    return eval_complete_f(x, y, test_x, test_y, 'hyperfast', clf_, metric_used, max_time)
+# param_grid_hyperopt['hyperfast'] = {
+#     'n_ensemble': hp.choice('n_ensemble', [1, 4, 8, 16, 32]),
+#     'batch_size': hp.choice('batch_size', [1024, 2048]),
+#     'nn_bias': hp.choice('nn_bias', [True, False]),
+#     'stratify_sampling': hp.choice('stratify_sampling', [True, False]),
+#     'optimization': hp.choice('optimization', [None, 'optimize', 'ensemble_optimize']),
+#     'optimize_steps': hp.choice('optimize_steps', [1, 4, 8, 16, 32, 64, 128]),
+# }
+#
+#
+# def hyperfast_metric_tuning(x, y, test_x, test_y, cat_features, metric_used, max_time=300, device='cpu', **kwargs):
+#     from hyperfast import HyperFastClassifier
+#     print(f"device: {device}")
+#     x = x.numpy()
+#     y = y.numpy()
+#     test_x = test_x.numpy()
+#     test_y = test_y.numpy()
+#
+#     def clf_(**params):
+#         return HyperFastClassifier(device=device, cat_features=cat_features, **params)
+#
+#     return eval_complete_f(x, y, test_x, test_y, 'hyperfast', clf_, metric_used, max_time)
 
 # Auto Gluon
 # WARNING: Crashes for some predictors for regression
@@ -920,7 +920,7 @@ def lightgbm_metric(x, y, test_x, test_y, cat_features, metric_used, max_time=30
 
 
 param_grid_hyperopt['logistic'] = {
-    'penalty': hp.choice('penalty', ['l1', 'l2', 'none']), 'max_iter': hp.randint('max_iter', 50, 500), 'fit_intercept': hp.choice('fit_intercept', [True, False]), 'C': hp.loguniform('C', -5, math.log(5.0))}  # 'normalize': [False],
+    'penalty': hp.choice('penalty', ['l1', 'l2']), 'max_iter': hp.randint('max_iter', 50, 500), 'fit_intercept': hp.choice('fit_intercept', [True, False]), 'C': hp.loguniform('C', -5, math.log(5.0))}  # 'normalize': [False],
 
 
 def logistic_metric(x, y, test_x, test_y, cat_features, metric_used, max_time=300, **kwargs):

@@ -1,3 +1,4 @@
+import math
 from typing import List, Tuple
 
 import numpy as np
@@ -365,7 +366,7 @@ def compute_top_pairs(X, y, pair_strategy: str, n_pair_feature_max_ratio: float 
     """
     assert pair_strategy in ["sum_importance", "fast"]
     assert 0 <= n_pair_feature_max_ratio <= 1
-    n_pair_feature_max = int(X.shape[1] * n_pair_feature_max_ratio)
+    n_pair_feature_max = math.ceil(X.shape[1] * n_pair_feature_max_ratio)
     if n_pair_feature_max == 0:
         return []
     else:
@@ -399,11 +400,14 @@ class MotherNetAdditiveClassifierPairEffects(MotherNetAdditiveClassifier):
             path=path, device=device, inference_device=inference_device, model=model, config=config,
             cat_features=cat_features,
         )
+        print("Yooo!")
         self.n_pair_feature_max_ratio = n_pair_feature_max_ratio
         assert pair_strategy in ["sum_importance", "fast"]
         self.pair_strategy = pair_strategy
 
     def fit(self, X, y):
+        print("Fit!")
+        print(self.n_pair_feature_max_ratio)
         if self.n_pair_feature_max_ratio > 0:
             # compute pairs according the selected strategy
             self.pairs_ = compute_top_pairs(

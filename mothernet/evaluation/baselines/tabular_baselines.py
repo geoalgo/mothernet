@@ -1365,7 +1365,6 @@ def nam_metric(x, y, test_x, test_y, cat_features, metric_used, max_time=300, de
     return eval_complete_f(x, y, test_x, test_y, 'nam', clf_, metric_used, max_time)
 
 
-
 clf_dict = {
     'gp': gp_metric,
     'random_forest': random_forest_metric,

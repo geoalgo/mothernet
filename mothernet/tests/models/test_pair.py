@@ -1,7 +1,8 @@
 import numpy as np
 import pytest
 
-from mothernet.prediction.mothernet_additive import compute_top_pairs, MotherNetAdditiveClassifierPairEffects
+from mothernet.prediction.mothernet_additive import compute_top_pairs, MotherNetAdditiveClassifierPairEffects, \
+    MotherNetAdditiveClassifierPairEffectsAuto
 from mothernet.utils import get_mn_model
 
 np.random.seed(0)
@@ -14,7 +15,7 @@ y = X[:, 0] + X[:, 3] - 2 * X[:, 0] * X[:, 3]
 y = y > 0.5
 
 
-@pytest.mark.parametrize("n_pair_feature_max_ratio", [0, 0.5, 1.0])
+@pytest.mark.parametrize("n_pair_feature_max_ratio", [0, 0.5, 1.0, 2.0])
 @pytest.mark.parametrize("pair_strategy", ["sum_importance", "fast"])
 def test_pair(n_pair_feature_max_ratio: float, pair_strategy: str):
     pairs = compute_top_pairs(X, y, pair_strategy=pair_strategy, n_pair_feature_max_ratio=n_pair_feature_max_ratio)
@@ -36,3 +37,23 @@ def test_estimator(n_pair_feature_max_ratio: float, pair_strategy: str):
     y_pred = clf.fit(X, y).predict(X)
     if n_pair_feature_max_ratio > 0:
         assert (y_pred == y).mean() > 0.9
+
+def test_estimator_auto_number_pair():
+    baam_model_string = "baam_nsamples500_numfeatures10_04_07_2024_17_04_53_epoch_1780.cpkt"
+    clf = MotherNetAdditiveClassifierPairEffectsAuto(
+        path=get_mn_model(baam_model_string),
+        n_pair_feature_max_ratios=[0, 0.1, 0.5, 1.0],
+    )
+    y_pred = clf.fit(X, y).predict(X)
+    assert (y_pred == y).mean() > 0.9
+
+
+def test_estimator_auto_number_pair_multiclass():
+    baam_model_string = "baam_nsamples500_numfeatures10_04_07_2024_17_04_53_epoch_1780.cpkt"
+    y = np.random.randint(0, 5, len(X))
+    clf = MotherNetAdditiveClassifierPairEffectsAuto(
+        path=get_mn_model(baam_model_string),
+        n_pair_feature_max_ratios=[0, 0.1, 2.0],
+    )
+    y_pred = clf.fit(X, y).predict(X)
+    # assert (y_pred == y).mean() > 0.9

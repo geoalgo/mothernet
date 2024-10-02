@@ -157,8 +157,8 @@ def cd_evaluation(performance_per_dataset, maximize_metric, verbose=False, ignor
 
     # -- Plot
     if ax is None:
-        fig, ax = plt.subplots(figsize=(14, 10))
+        fig, ax = plt.subplots(figsize=(12, 3.5))
     plt.rcParams.update({"font.size": 16})
-    _custom_cd_diagram(result, order == "ascending", ax, 8, linewidth=linewidth, linewidth_bar=linewidth_bar)
+    _custom_cd_diagram(result, order == "ascending", ax, 12, linewidth=linewidth, linewidth_bar=linewidth_bar)
 
     return result

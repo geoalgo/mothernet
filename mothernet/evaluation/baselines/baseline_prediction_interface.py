@@ -22,11 +22,11 @@ def baseline_predict(metric_function, eval_xs, eval_ys, categorical_feats, metri
     (eval_x, eval_y), = eval_splits
 
     metric, output, best_config = metric_function(
-        eval_x[:eval_pos],
-        eval_y[:eval_pos],
-        eval_x[eval_pos:],
-        eval_y[eval_pos:],
-        categorical_feats,
+        x=eval_x[:eval_pos],
+        y=eval_y[:eval_pos],
+        test_x=eval_x[eval_pos:],
+        test_y=eval_y[eval_pos:],
+        cat_features=categorical_feats,
         metric_used=metric_used, max_time=max_time, **kwargs)
     metrics += [metric]
     outputs += [output]

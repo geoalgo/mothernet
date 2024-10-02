@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 import openml
 import pandas as pd
@@ -150,7 +152,15 @@ def get_openml_classification(did, max_samples, multiclass=True, shuffled=True):
 def load_openml_list(dids, classification=True, filter_for_nan=False, num_feats=100, min_samples=100, max_samples=400,
                      multiclass=True, max_num_classes=10, shuffled=True, return_capped=False, verbose=0):
     datasets = []
-    openml_list = openml.datasets.list_datasets(dids)
+    openml_list = None
+    for _ in range(10):
+        try:
+            openml_list = openml.datasets.list_datasets(dids)
+            break
+        except Exception as e:
+            print(f"Error while trying to call openml, sleeping 2s and trying again: {e}")
+            time.sleep(2)
+    assert openml_list is not None, "could not call openml."
     print(f'Number of datasets: {len(openml_list)}')
 
     datalist = pd.DataFrame.from_dict(openml_list, orient="index")

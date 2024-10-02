@@ -4,7 +4,10 @@ from typing import List, Tuple
 import numpy as np
 import pandas as pd
 import torch
+from interpret.utils import measure_interactions
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
+from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 from mothernet.model_builder import load_model
@@ -365,7 +368,7 @@ def compute_top_pairs(X, y, pair_strategy: str, n_pair_feature_max_ratio: float 
     predictive of y according to the strategy.
     """
     assert pair_strategy in ["sum_importance", "fast"]
-    assert 0 <= n_pair_feature_max_ratio <= 1
+    # assert 0 <= n_pair_feature_max_ratio <= 1
     n_pair_feature_max = math.ceil(X.shape[1] * n_pair_feature_max_ratio)
     if n_pair_feature_max == 0:
         return []
@@ -383,10 +386,18 @@ def compute_top_pairs(X, y, pair_strategy: str, n_pair_feature_max_ratio: float 
             pairs = sorted(pairs, key=lambda x: x[2], reverse=True)
             pairs = [(i, j) for i, j, importance_sum in pairs]
         elif pair_strategy == "fast":
+            n_interactions = int(np.ceil(X.shape[1] * n_pair_feature_max_ratio))
+            pair_measure_interactions = measure_interactions(
+                X,
+                y,
+                interactions=n_interactions,
+            )
+            pairs = [(x, y) for (x, y), importance in pair_measure_interactions]
+        elif pair_strategy == "ebm":
             if n_pair_feature_max_ratio == 1.0:
                 # note we set the ratio to 0.9999 here as 1.0 does not work for EBM and is confounded with 1
                 n_pair_feature_max_ratio = 0.999999
-            clf = ExplainableBoostingClassifier(interactions=n_pair_feature_max_ratio)
+            clf = ExplainableBoostingClassifier(interactions=n_pair_feature_max)
             clf.fit(X, y)
             pairs = [(x[0], x[1]) for x in clf.term_features_ if len(x) == 2]
 
@@ -395,37 +406,116 @@ def compute_top_pairs(X, y, pair_strategy: str, n_pair_feature_max_ratio: float 
 
 class MotherNetAdditiveClassifierPairEffects(MotherNetAdditiveClassifier):
     def __init__(self, path=None, device="cpu", inference_device="cpu", model=None, config=None,
-                 cat_features: List[int] = None, n_pair_feature_max_ratio: float = 0.9, pair_strategy: str = "sum_importance"):
+                 cat_features: List[int] = None, n_pair_feature_max_ratio: float | list[float] = 0.9, pair_strategy: str = "fast", pairs = None):
         super(MotherNetAdditiveClassifierPairEffects, self).__init__(
             path=path, device=device, inference_device=inference_device, model=model, config=config,
             cat_features=cat_features,
         )
         self.n_pair_feature_max_ratio = n_pair_feature_max_ratio
-        assert pair_strategy in ["sum_importance", "fast"]
+        assert pair_strategy in ["sum_importance", "fast", "ebm"]
         self.pair_strategy = pair_strategy
+        self.pairs = pairs
 
     def fit(self, X, y):
         print(f"Fit with {self.n_pair_feature_max_ratio} pair ratio")
+
         if self.n_pair_feature_max_ratio > 0:
-            # compute pairs according the selected strategy
-            self.pairs_ = compute_top_pairs(
-                X,
-                y,
-                pair_strategy=self.pair_strategy,
-                n_pair_feature_max_ratio=self.n_pair_feature_max_ratio
-            )
-            print(f"Going to use {len(self.pairs_)} pairs ({X.shape[1]} features present)")
+            if self.pairs is None:
+                # compute pairs according the selected strategy
+                self.pairs = compute_top_pairs(
+                    X,
+                    y,
+                    pair_strategy=self.pair_strategy,
+                    n_pair_feature_max_ratio=self.n_pair_feature_max_ratio
+                )
+                print(f"Going to use {len(self.pairs)} pairs ({X.shape[1]} features present)")
 
             # and generate features for those pairs
-            X = make_X_with_pair_effect(X, self.pairs_)
+            X = make_X_with_pair_effect(X, self.pairs)
         return super().fit(X, y)
 
     def predict_proba_with_additive_components(self, X):
-        if self.n_pair_feature_max_ratio > 0:
-            X = make_X_with_pair_effect(X, self.pairs_)
+        if self.pairs:
+            X = make_X_with_pair_effect(X, self.pairs)
 
         return predict_with_additive_model(self.X_train_, X, self.w_, self.b_, self.bin_edges_, nan_bin=self.nan_bin,
                                            inference_device=self.inference_device, regression=False)
+
+
+class MotherNetAdditiveClassifierPairEffectsAuto(ClassifierMixin, BaseEstimator, ExplainableAdditivePredictor):
+    def __init__(self, path=None, device="cpu", inference_device="cpu", model=None, config=None,
+                 cat_features: List[int] = None, n_pair_feature_max_ratios: list[float] | None = None, pair_strategy: str = "fast"):
+        self.path = path
+        self.device = device
+        self.inference_device = inference_device
+        self.model = model
+        self.config = config
+        self.cat_features = cat_features
+        if n_pair_feature_max_ratios is None:
+            self.n_pair_feature_max_ratios = [0.01, 0.05, 0.1, 0.2, 0.4, 0.8, 0.9]
+        else:
+            self.n_pair_feature_max_ratios = n_pair_feature_max_ratios
+        self.pair_strategy = pair_strategy
+
+    def fit(self, X, y):
+        all_pairs = compute_top_pairs(
+            X,
+            y,
+            pair_strategy=self.pair_strategy,
+            n_pair_feature_max_ratio=1.0,
+        )
+        # check error on CV for all n_pair_feature_max_ratio and choose the best
+        X_train, X_val, y_train, y_val = train_test_split(X, y, random_state=42)
+        rocs = []
+        for n_pair_feature_max_ratio in self.n_pair_feature_max_ratios:
+            n_features = int(np.ceil(X.shape[1] * n_pair_feature_max_ratio))
+            # X = make_X_with_pair_effect(X, all_pairs[:n_features])
+            model = MotherNetAdditiveClassifierPairEffects(
+                path=self.path,
+                device=self.device,
+                inference_device=self.inference_device,
+                model=self.model,
+                config=self.config,
+                cat_features=self.cat_features,
+                n_pair_feature_max_ratio=n_pair_feature_max_ratio,
+                pairs=all_pairs[:n_features],
+                # pair_strategy=self.pair_strategy
+            ).fit(X, y)
+            y_val_pred = model.predict_proba(X_val)
+            if y_val_pred.shape[1] == 2:
+                # binary
+                y_val_pred = y_val_pred[:, 1]
+                multiclass="raise"
+            else:
+                multiclass="ovo"
+            # TODO make sure we are using classification
+            roc = roc_auc_score(y_true=y_val, y_score=y_val_pred, multi_class=multiclass)
+            rocs.append(roc)
+        print(f"CV ROCs: {rocs}")
+        # pick the ratio with best validation ROC
+        self.best_feature_max_ratio = self.n_pair_feature_max_ratios[np.argmax(rocs)]
+        n_features = int(np.ceil(X.shape[1] * self.best_feature_max_ratio))
+        self.pairs = all_pairs[:n_features]
+        print(f"Selected {len(self.pairs)} pairs ({X.shape[1]} features present)")
+
+        self.model = MotherNetAdditiveClassifierPairEffects(
+            path=self.path,
+            device=self.device,
+            inference_device=self.inference_device,
+            model=self.model,
+            config=self.config,
+            cat_features=self.cat_features,
+            n_pair_feature_max_ratio=self.best_feature_max_ratio,
+            pair_strategy=self.pair_strategy,
+            pairs=self.pairs
+        )
+        return self.model.fit(X, y)
+
+    def predict_proba(self, X):
+        return self.model.predict_proba(X)
+
+    def predict(self, X):
+        return self.model.predict(X)
 
 
 class MotherNetAdditiveRegressor(RegressorMixin, BaseEstimator, ExplainableAdditivePredictor):

@@ -1,7 +1,7 @@
 import argparse
 import warnings
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, time
 from pathlib import Path
 
 import pandas as pd
@@ -11,33 +11,35 @@ from mothernet.utils import get_mn_model
 warnings.simplefilter("ignore", FutureWarning)  # openml deprecation of array return type
 from mothernet.datasets import load_openml_list, open_cc_dids
 from mothernet.evaluation.baselines.tabular_baselines import knn_metric, logistic_metric, xgb_metric, random_forest_metric, mlp_metric
-from mothernet.evaluation.tabular_evaluation import transformer_metric
+from mothernet.evaluation.tabular_evaluation import transformer_metric, is_classification
 from mothernet.evaluation import tabular_metrics
 from mothernet.prediction.tabpfn import TabPFNClassifier
 from functools import partial
 from mothernet.evaluation.tabular_evaluation import eval_on_datasets
-from mothernet.prediction.mothernet_additive import MotherNetAdditiveClassifier, MotherNetAdditiveClassifierPairEffects
+from mothernet.prediction.mothernet_additive import MotherNetAdditiveClassifier, MotherNetAdditiveClassifierPairEffects, \
+    MotherNetAdditiveClassifierPairEffectsAuto
 
 from interpret.glassbox import ExplainableBoostingClassifier
 
 
 from sklearn import set_config
 
-pair_ratios = [0.01, 0.05, 0.1, 0.2, 0.4, 0.8, 0.9]
+pair_ratios = [0.0, 0.01, 0.05, 0.1, 0.2, 0.4, 0.8, 0.9]
 allowed_methods = [
     'knn',
     'rf_new_params',
     'xgb',
     'logistic',
-    'mlp',
+    # 'mlp',
     'tabpfn',
     'ebm_default',
     'ebm_bins',
     'ebm_bins_main_effects',
     'baam_single_effect',
+    'baam_auto_pair_effect_fast',
 ]
 for pair_ratio in pair_ratios:
-    allowed_methods.append(f"baam_{pair_ratio}_pair_effect")
+    # allowed_methods.append(f"baam_{pair_ratio}_pair_effect")
     allowed_methods.append(f"baam_{pair_ratio}_pair_effect_fast")
 
 
@@ -51,7 +53,8 @@ def evaluate(method: str | None, n_datasets: int | None):
     n_samples = 2000
     base_path = Path("./")
     overwrite = False
-    max_times = [1, 15, 30, 60, 60 * 5, 60 * 15, 60*60]
+    # max_times = [1, 15, 30, 60, 60 * 5, 60 * 15, 60*60]
+    max_times = [60 * 60]
     metric_used = tabular_metrics.auc_metric
     split_numbers = [1, 2, 3, 4, 5]
     task_type = 'multiclass'
@@ -65,7 +68,7 @@ def evaluate(method: str | None, n_datasets: int | None):
     cc_test_datasets_multiclass_df['NumberOfFeatures'] = cc_test_datasets_multiclass_df['NumberOfFeatures'].astype(int)
     cc_test_datasets_multiclass_df['NumberOfClasses'] = cc_test_datasets_multiclass_df['NumberOfClasses'].astype(int)
 
-    print(cc_test_datasets_multiclass_df[['did', 'name', 'NumberOfFeatures', 'NumberOfInstances', 'NumberOfClasses']].rename(columns={'NumberOfFeatures': "d", "NumberOfInstances":"n", "NumberOfClasses": "k"}).to_latex(index=False))
+    # print(cc_test_datasets_multiclass_df[['did', 'name', 'NumberOfFeatures', 'NumberOfInstances', 'NumberOfClasses']].rename(columns={'NumberOfFeatures': "d", "NumberOfInstances":"n", "NumberOfClasses": "k"}).to_latex(index=False))
 
     clf_dict = {
         'knn': knn_metric,
@@ -106,12 +109,19 @@ def evaluate(method: str | None, n_datasets: int | None):
         ),
     }
 
+
     for pair_ratio in pair_ratios:
-        clf_dict[f"baam_{pair_ratio}_pair_effect"] = MotherNetAdditiveClassifierPairEffects(
+        # clf_dict[f"baam_{pair_ratio}_pair_effect"] = partial(transformer_metric, MotherNetAdditiveClassifierPairEffects(
+        #     device='cpu',
+        #     path=get_mn_model(baam_model_string),
+        #     n_pair_feature_max_ratio=pair_ratio,
+        # )),
+        clf_dict[f"baam_auto_pair_effect_fast"] = MotherNetAdditiveClassifierPairEffectsAuto(
             device='cpu',
             path=get_mn_model(baam_model_string),
-            n_pair_feature_max_ratio=pair_ratio,
+            pair_strategy="fast",
         )
+
         clf_dict[f"baam_{pair_ratio}_pair_effect_fast"] = MotherNetAdditiveClassifierPairEffects(
             device='cpu',
             path=get_mn_model(baam_model_string),

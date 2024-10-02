@@ -153,6 +153,7 @@ INTERNAL HELPER FUNCTIONS
 
 
 def _eval_single_dataset_wrapper(**kwargs):
+    print(kwargs['datasets'][0][0])
     max_time = kwargs['max_time']
     metric_used = kwargs['metric_used']
     time_string = '_time_'+str(max_time) if max_time else ''

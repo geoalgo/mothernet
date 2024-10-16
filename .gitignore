@@ -183,5 +183,7 @@ mothernet/models_diff
 tabpfn/mlruns/
 tabpfn/results
 mothernet/results_bak
+log_slurm/
+results/
 
 mlruns

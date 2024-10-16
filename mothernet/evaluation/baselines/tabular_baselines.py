@@ -1336,6 +1336,49 @@ def flaml_lgbm_metric(x, y, test_x, test_y, cat_features, metric_used, max_time=
     return metric, pred, times
 
 
-clf_dict = {'gp': gp_metric, 'random_forest': random_forest_metric, 'knn': knn_metric, 'catboost': catboost_metric, 'tabnet': tabnet_metric,
-            'xgb': xgb_metric, 'lightgbm': lightgbm_metric, 'ridge': ridge_metric, 'logistic': logistic_metric, 'autosklearn': autosklearn_metric, 'autosklearn2': autosklearn2_metric,
-            'autogluon': autogluon_metric, 'cocktail': well_tuned_simple_nets_metric}
+# NAM
+param_grid_hyperopt['nam']= {
+    'lr': hp.loguniform('lr', math.log(1e-4), math.log(1e-1)),
+    'weight_decay': hp.loguniform('weight_decay', math.log(0.01), math.log(1.0)),
+    'output_regularization': hp.loguniform('output_regularization', math.log(0.01), math.log(1.0)),
+    'dropout': hp.loguniform('dropout', math.log(0.01), math.log(1.0)),
+    'feature_dropout': hp.loguniform('feature_dropout', math.log(0.01), math.log(1.0)),
+    'batch_size': hp.choice('batch_size', [128, 512, 1024]),
+    'hidden_sizes': hp.choice('hidden_sizes', [[], [32], [64, 32]]),
+    'n_epochs': hp.choice('n_epochs', [10, 100, 1000]),
+}
+
+def nam_metric(x, y, test_x, test_y, cat_features, metric_used, max_time=300, device="cpu", **kwargs):
+    x, y, test_x, test_y = preprocess_impute(x, y, test_x, test_y,
+                                             one_hot=True, impute=True, standardize=True,
+                                             cat_features=cat_features)
+    from mothernet.evaluation.baselines.nam import TorchNAM
+
+    def clf_(**params):
+        if is_classification(metric_used):
+            return TorchNAM(**params, device=device, verbose=kwargs["verbose"],
+                           regression=False)
+        else:
+            return TorchNAM(**params, device=device, verbose=kwargs["verbose"],
+                           regression=True)
+
+    return eval_complete_f(x, y, test_x, test_y, 'nam', clf_, metric_used, max_time)
+
+
+
+clf_dict = {
+    'gp': gp_metric,
+    'random_forest': random_forest_metric,
+    'knn': knn_metric,
+    'catboost': catboost_metric,
+    'tabnet': tabnet_metric,
+    'xgb': xgb_metric,
+    'lightgbm': lightgbm_metric,
+    'ridge': ridge_metric,
+    'logistic': logistic_metric,
+    'autosklearn': autosklearn_metric,
+    'autosklearn2': autosklearn2_metric,
+    'autogluon': autogluon_metric,
+    'cocktail': well_tuned_simple_nets_metric,
+    'nam': nam_metric
+}
